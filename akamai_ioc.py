@@ -53,7 +53,6 @@ class APIAKAOpenParser():
 
      def get_results(self):
         event = json.loads(self.misp_event.to_json())
-        log.info('EVENT Raw {}'.format(event))
         results = {key: event[key] for key in ('Attribute', 'Object') if (key in event and event[key])}
         return {'results': results}
 
@@ -67,7 +66,6 @@ class APIAKAOpenParser():
         )
         result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/information?record=' + rrecord))  
         q = result.json()
-        log.info('Restuls Raw {}'.format(q))
         to_Enrich = ""
         whois_info = ""
         urlList = ""
@@ -86,7 +84,7 @@ class APIAKAOpenParser():
             if k == 'registrarName':
                 whois_info += str(k) + ": " + str(q[k]) + "\n"
             if k == 'registrantName':
-                whois_info += str(k) + ": " + str(q[k]) + "\n"
+                aka_object.add_attribute('Registrant name', type='whois-registrant-name', value=str(q[k]))
             if k == 'strantOrganizatione':
                 whois_info += str(k) + ": " + str(q[k]) + "\n"
             if k == 'registrantCity':
@@ -94,7 +92,7 @@ class APIAKAOpenParser():
             if k == 'registrantState':
                 whois_info += str(k) + ": " + str(q[k]) + "\n"
             if k == 'registrantEmails':
-                whois_info += str(k) + ": " + str(q[k]) + "\n"
+                aka_object.add_attribute('Registrant Emails', type='whois-registrant-email', value=str(q[k]))
             if k == 'nameServerNames':
                 whois_info += str(k) + ": " + str(q[k]) + "\n"
             if k == 'registrantAddress':
@@ -105,38 +103,94 @@ class APIAKAOpenParser():
                 whois_info += str(k) + ": " + str(q[k]) + "\n"
             if k == 'badUrls':
                 for item in q['badUrls'][0]['badUrls']:
-                    urlList += str(item['url']) + "\n"
+                    aka_object.add_attribute('Links', type='link', value=str(item['url']))
             if k == 'createdDate':
                 to_Enrich += "Record Created: " + str(q[k]) + "\n"
             if k == 'lastModifiedDate':
                 to_Enrich += "Record Last Modified: " + str(q[k]) + "\n"
-            ''' 
             if k == 'threatInformation' and threatInfo == "":
-                addresult = session.get(urljoin(self.baseurl, '/etp-report/v1/configs/' + str(
-                    self.configID) + '/threats/' + str(q['threatInformation'][0]['threatId'])))
-                d = addresult.json()
-                log.info('Restuls Raw TINFO {}'.format(d))
-                threatInfo = "\nThreat Name: " + str(d['threatName']) + "\nLinks: " + str(
-                    d['externalLinks']) + "\nDescription: " + str(d['description'] + " ")
-                commentval += threatInfo
-            '''
-        #formatted_changes = get_ioc_changes(session, self.baseurl, rrecord)
-        #to_Enrich += "\nIOC Changes: \n" + formatted_changes + "\n"
+                threatIN = q['threatInformation']
+                tmpI = 0
+                ThreatTag = tagval
+                for item in threatIN:
+                    if item['threatId'] != tmpI:
+                        addresult = session.get(urljoin(self.baseurl, '/etp-report/v1/configs/' + str(self.configID) + '/threats/' + str(item['threatId'])))
+                        d = addresult.json()
+                        threatInfo = "\nThreat Name: " + str(d['threatName']) + "\nLinks: " + str(d['externalLinks']) + "\nDescription: " + str(d['description'] + " ")
+                        ThreatTag.append("Threat:"+d['threatName'])
+                        aka_object.add_attribute('Threat Info', type='text', value=threatInfo, Tag=ThreatTag)
+                        tmpI = item['threatId']
         if whois_info != "":
             to_Enrich += "\nWhois Information: \n" + whois_info + "\n"
         if urlList != "":
             to_Enrich += "\nURL list: \n" + urlList + "\n"
+        #custom_info = get_customize_info()
+        #aka_object.add_attribute('Customer Attribution', type='text', value=custom_info, Tag=tagval)
         #try:
         #    custom_info = get_customize_info(session, self.baseurl, request)
         #    to_Enrich += custom_info
         #except Exception as e:
         #    log.info('Exception in custom info {}'.format(e))
         
+        try:
+            changes_result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/changes?record=' + rrecord))
+            changes = changes_result.json()
+            reduced_changes = [{"date": str(change["date"]), "description": str(change["description"])} for change in changes]
+            aka_object.add_attribute('IOC Changes', type='text', value=str(reduced_changes), Tag=tagval)
+        except Exception as e:
+            log.info('Exception in custom info {}'.format(e))
+
         aka_object.add_attribute('Domain Threat Info', type='text', value=to_Enrich, Tag=tagval)
         self.misp_event.add_object(**aka_object)
         
+     def get_customize_info(self):
+        machines_text = '\n\n'
+        user_text = '\n\n'
+        machine_result = run_custom_request(self, dimension='deviceId')
+        if machine_result['dimension']['total'] != 0:
+          machines_text += 'Machines involved\n\n'
+          if 'aggregations' in machine_result:
+             for el in machine_result['aggregations']:
+                name = el['name']
+                if "Not" in name:
+                    name = 'No machine name attributed'
+                machines_text += f"{name} : {el['total']} connections \n"
 
-    
+        user_result = run_custom_request(self, dimension='encryptedUserName')
+        if user_result['dimension']['total'] != 0:
+          if 'aggregations' in user_result:
+             user_text += 'Users involved : \n\n'
+             for el in user_result['aggregations']:
+                name = el['name']
+                if len(name) < 2:
+                    name = 'No user name attributed'
+                user_text += f"{name} : {el['total']} connections \n"
+        return machines_text + user_text
+
+
+     def run_custom_request(self, dimension):
+        session  = requests.Session()
+        session.auth = EdgeGridAuth(
+        client_token  = self.ctoken,
+        client_secret = self.csecret,
+        access_token  = self.atoken
+        )
+        baseurl = self.baseurl
+        confID = self.configID
+        start, end = get_epoch_range()
+        url = f'/etp-report/v2/configs/{str(confID)}' + \
+              f'/threat-events/aggregate?cardinality=2500&dimension={dimension}&endTimeSec={end}&filters' + \
+              f'=%7B%22domain%22:%7B%22in%22:%5B%22{rrecord}%22%5D%7D%7D&startTimeSec={start}'
+        result = session.get(urljoin(baseurl, url)).json()
+        return result
+
+
+     def get_epoch_range():
+        epoch_time = int(time.time())
+        last_30_days = epoch_time - 3600 * 24 * 30  # last month by default for now
+        return last_30_days, epoch_time
+
+
 
 def introspection():
     return mispattributes
@@ -151,7 +205,6 @@ def handler(q=False):
     if q is False:
         return False
     request  = json.loads(q)
-    log.info('request raw: {}'.format(request))
     attribute = request['attribute']
     ctoken   = str(request['config']['client_token'])
     csecret  = str(request['config']['client_secret'])
@@ -159,60 +212,13 @@ def handler(q=False):
     configID = str(request['config']['etp_config_id'])
     baseurl  = str(request['config']['apiURL'])
     rrecord = str(attribute['value'])
-    log.info('record request {}'.format(rrecord))
     mapping = {
             'domain': 'parse_domain'
     }
     aka_parser = APIAKAOpenParser(ctoken, csecret, atoken, configID, baseurl, rrecord)
-    log.info('aka_parser {}'.format(aka_parser))
     attribute_value = attribute['value'] if 'value' in attribute else attribute['value1']
-    log.info('attribute_value {}'.format(attribute_value))
     getattr(aka_parser, mapping[attribute['type']])(attribute_value)
     return aka_parser.get_results()
 
 
-def get_customize_info(session, baseurl, request):
-    machines_text = '\n\n'
-    user_text = '\n\n'
-    machine_result = run_custom_request(session, baseurl, request, dimension='deviceId')
-    if machine_result['dimension']['total'] != 0:
-      machines_text += 'Machines involved\n\n'
-      if 'aggregations' in machine_result:
-         for el in machine_result['aggregations']:
-            name = el['name']
-            if "Not" in name:
-                name = 'No machine name attributed'
-            machines_text += f"{name} : {el['total']} connections \n"
 
-    user_result = run_custom_request(session, baseurl, request, dimension='encryptedUserName')
-    if user_result['dimension']['total'] != 0:
-      if 'aggregations' in user_result:
-         user_text += 'Users involved : \n\n'
-         for el in user_result['aggregations']:
-            name = el['name']
-            if len(name) < 2:
-                name = 'No user name attributed'
-            user_text += f"{name} : {el['total']} connections \n"
-    return machines_text + user_text
-
-
-def run_custom_request(session, baseurl, request, dimension):
-    start, end = get_epoch_range()
-    url = f'/etp-report/v2/configs/{str(request["config"]["etp_config_id"])}' + \
-          f'/threat-events/aggregate?cardinality=2500&dimension={dimension}&endTimeSec={end}&filters' + \
-          f'=%7B%22domain%22:%7B%22in%22:%5B%22{rrecord}%22%5D%7D%7D&startTimeSec={start}'
-    result = session.get(urljoin(baseurl, url)).json()
-    return result
-
-
-def get_epoch_range():
-    epoch_time = int(time.time())
-    last_30_days = epoch_time - 3600 * 24 * 30  # last month by default for now
-    return last_30_days, epoch_time
-
-
-def get_ioc_changes(session, baseurl, domain):
-    changes_result = session.get(urljoin(baseurl, '/etp-report/v1/ioc/changes?record=' + domain))
-    changes = changes_result.json()
-    reduced_changes = [{"date": str(change["date"]), "description": str(change["description"])} for change in changes]
-    return '\n'.join([str(change) for change in reduced_changes])
