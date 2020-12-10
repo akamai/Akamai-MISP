@@ -3,7 +3,6 @@
 Module (type "expansion") from Akamai to provide IOC analysis.
 Date : 12/1/2020
 Authers: ["Shiran Guez","Jordan Garzon","Avishai Katz","Asaf Nadler"]
-Converted to MISP Obj
 """
 import json
 import time
