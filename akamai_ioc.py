@@ -126,64 +126,47 @@ class APIAKAOpenParser():
             to_Enrich += "\nWhois Information: \n" + whois_info + "\n"
         if urlList != "":
             to_Enrich += "\nURL list: \n" + urlList + "\n"
+        self._get_dns_info(rrecord)
         
         try:
             changes_result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/changes?record=' + rrecord))
             changes = changes_result.json()
             for change in changes:
-                aka_object.add_attribute(str(change["description"]), **{'type': 'datetime', 'value': change['date']})
+                aka_object.add_attribute('timeline', **{'type': 'datetime', 'value': change['date'], 'comment': str(change["description"])})
         except Exception as e:
+            log.info('Exception in custom info {}'.format(e))
 
         aka_object.add_attribute('Domain Threat Info', type='text', value=to_Enrich, Tag=tagval)
         self.misp_event.add_object(**aka_object)
         
-     def get_customize_info(self):
-        machines_text = '\n\n'
-        user_text = '\n\n'
-        machine_result = run_custom_request(self, dimension='deviceId')
-        if machine_result['dimension']['total'] != 0:
-          machines_text += 'Machines involved\n\n'
-          if 'aggregations' in machine_result:
-             for el in machine_result['aggregations']:
-                name = el['name']
-                if "Not" in name:
-                    name = 'No machine name attributed'
-                machines_text += f"{name} : {el['total']} connections \n"
-
-        user_result = run_custom_request(self, dimension='encryptedUserName')
-        if user_result['dimension']['total'] != 0:
-          if 'aggregations' in user_result:
-             user_text += 'Users involved : \n\n'
-             for el in user_result['aggregations']:
-                name = el['name']
-                if len(name) < 2:
-                    name = 'No user name attributed'
-                user_text += f"{name} : {el['total']} connections \n"
-        return machines_text + user_text
-
-
-     def run_custom_request(self, dimension):
-        session  = requests.Session()
-        session.auth = EdgeGridAuth(
-        client_token  = self.ctoken,
-        client_secret = self.csecret,
-        access_token  = self.atoken
-        )
-        baseurl = self.baseurl
-        confID = self.configID
-        start, end = get_epoch_range()
-        url = f'/etp-report/v2/configs/{str(confID)}' + \
-              f'/threat-events/aggregate?cardinality=2500&dimension={dimension}&endTimeSec={end}&filters' + \
-              f'=%7B%22domain%22:%7B%22in%22:%5B%22{rrecord}%22%5D%7D%7D&startTimeSec={start}'
-        result = session.get(urljoin(baseurl, url)).json()
-        return result
-
-
-     def get_epoch_range():
-        epoch_time = int(time.time())
-        last_30_days = epoch_time - 3600 * 24 * 30  # last month by default for now
-        return last_30_days, epoch_time
-
+     def _get_dns_info(self, rrecord):
+        aka_cust_object = MISPObject('misc')
+        tagInfo=["source:AkamaiETP"]
+        _text = ""
+        dimensions = ['deviceId','site']
+        for dimension in dimensions:
+            #_result = self._run_custom_request(self, rrecord, dimension)
+            session  = requests.Session()
+            session.auth = EdgeGridAuth(
+               client_token  = self.ctoken,
+               client_secret = self.csecret,
+               access_token  = self.atoken
+            )
+            confID = self.configID
+            epoch_time = int(time.time())
+            last_30_days = epoch_time - 3600 * 24 * 30  # last month by default for now
+            url = f'/etp-report/v2/configs/{str(confID)}' + \
+                  f'/dns-activities/aggregate?cardinality=2500&dimension={dimension}&endTimeSec={epoch_time}&filters' + \
+                  f'=%7B%22domain%22:%7B%22in%22:%5B%22{rrecord}%22%5D%7D%7D&startTimeSec={last_30_days}'
+            _result = session.get(urljoin(self.baseurl, url)).json()
+            if _result['dimension']['total'] != 0:
+                 _text += dimension + ' involved\n\n'
+                 if 'aggregations' in _result:
+                    for el in _result['aggregations']:
+                        name = el['name']
+                        _text += f"{name} : {el['total']} connections \n"
+                    aka_cust_object.add_attribute('Customer Attribution', type='text', value=str(_text), Tag=tagInfo)
+                 self.misp_event.add_object(**aka_cust_object)
 
 
 def introspection():
