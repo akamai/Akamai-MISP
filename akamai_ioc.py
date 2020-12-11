@@ -103,11 +103,11 @@ class APIAKAOpenParser():
                 whois_info += str(k) + ": " + str(q[k]) + "\n"
             if k == 'badUrls':
                 for item in q['badUrls'][0]['badUrls']:
-                    aka_object.add_attribute('Links', type='link', value=str(item['url']))
+                    aka_object.add_attribute('PMD', **{'type': 'url', 'value': item['url']})
             if k == 'createdDate':
-                to_Enrich += "Record Created: " + str(q[k]) + "\n"
+                aka_object.add_attribute('first-seen', **{'type': 'datetime', 'value': q[k]})
             if k == 'lastModifiedDate':
-                to_Enrich += "Record Last Modified: " + str(q[k]) + "\n"
+                aka_object.add_attribute('last-seen', **{'type': 'datetime', 'value': q[k]})
             if k == 'threatInformation' and threatInfo == "":
                 threatIN = q['threatInformation']
                 tmpI = 0
@@ -116,29 +116,23 @@ class APIAKAOpenParser():
                     if item['threatId'] != tmpI:
                         addresult = session.get(urljoin(self.baseurl, '/etp-report/v1/configs/' + str(self.configID) + '/threats/' + str(item['threatId'])))
                         d = addresult.json()
-                        threatInfo = "\nThreat Name: " + str(d['threatName']) + "\nLinks: " + str(d['externalLinks']) + "\nDescription: " + str(d['description'] + " ")
+                        threatInfo = "\nThreat Name: " + str(d['threatName']) + "\nDescription: " + str(d['description'] + " ")
                         ThreatTag.append("Threat:"+d['threatName'])
                         aka_object.add_attribute('Threat Info', type='text', value=threatInfo, Tag=ThreatTag)
+                        for link in d['externalLinks']:
+                            aka_object.add_attribute('reference', type='link', value=link, Tag=ThreatTag)
                         tmpI = item['threatId']
         if whois_info != "":
             to_Enrich += "\nWhois Information: \n" + whois_info + "\n"
         if urlList != "":
             to_Enrich += "\nURL list: \n" + urlList + "\n"
-        #custom_info = get_customize_info()
-        #aka_object.add_attribute('Customer Attribution', type='text', value=custom_info, Tag=tagval)
-        #try:
-        #    custom_info = get_customize_info(session, self.baseurl, request)
-        #    to_Enrich += custom_info
-        #except Exception as e:
-        #    log.info('Exception in custom info {}'.format(e))
         
         try:
             changes_result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/changes?record=' + rrecord))
             changes = changes_result.json()
-            reduced_changes = [{"date": str(change["date"]), "description": str(change["description"])} for change in changes]
-            aka_object.add_attribute('IOC Changes', type='text', value=str(reduced_changes), Tag=tagval)
+            for change in changes:
+                aka_object.add_attribute(str(change["description"]), **{'type': 'datetime', 'value': change['date']})
         except Exception as e:
-            log.info('Exception in custom info {}'.format(e))
 
         aka_object.add_attribute('Domain Threat Info', type='text', value=to_Enrich, Tag=tagval)
         self.misp_event.add_object(**aka_object)
