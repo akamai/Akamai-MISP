@@ -117,7 +117,7 @@ class APIAKAOpenParser():
                         addresult = session.get(urljoin(self.baseurl, '/etp-report/v1/configs/' + str(self.configID) + '/threats/' + str(item['threatId'])))
                         d = addresult.json()
                         threatInfo = "\nThreat Name: " + str(d['threatName']) + "\nDescription: " + str(d['description'] + " ")
-                        ThreatTag.append("Threat:"+d['threatName'])
+                        ThreatTag.append("misp-galaxy:"+d['familyName']+'="'+d['threatName']+'"')
                         aka_object.add_attribute('Threat Info', type='text', value=threatInfo, Tag=ThreatTag)
                         for link in d['externalLinks']:
                             aka_object.add_attribute('reference', type='link', value=link, Tag=ThreatTag)
