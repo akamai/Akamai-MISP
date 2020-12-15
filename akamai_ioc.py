@@ -69,8 +69,16 @@ class APIAKAOpenParser():
         to_Enrich = ""
         whois_info = ""
         urlList = ""
+        incident_flag = "false"
         commentval = "Akamai IOC enrich"
-        tagval = ["source:AkamaiETP"]
+        self._get_dns_info(rrecord)
+        try:
+            if self.incident_flag == "true":
+                tagval = ["AkamaiETP:incident-classification=incident"]
+            else:
+                tagval = ["source:AkamaiETP"]
+        except:
+            tagval = ["source:AkamaiETP"]
         threatInfo = ""
         for (k, v) in q.items():
             if k == 'record':
@@ -134,7 +142,6 @@ class APIAKAOpenParser():
             to_Enrich += "\nWhois Information: \n" + whois_info + "\n"
         if urlList != "":
             to_Enrich += "\nURL list: \n" + urlList + "\n"
-        self._get_dns_info(rrecord)
         
         try:
             changes_result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/changes?record=' + rrecord))
@@ -174,6 +181,7 @@ class APIAKAOpenParser():
                         name = el['name']
                         _text += f"{name} : {el['total']} connections \n"
                     aka_cust_object.add_attribute('Customer Attribution', type='text', value=str(_text), Tag=tagInfo)
+                 self.incident_flag = "true"
                  self.misp_event.add_object(**aka_cust_object)
 
 
