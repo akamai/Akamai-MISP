@@ -113,9 +113,9 @@ class APIAKAOpenParser():
                 for item in q['badUrls'][0]['badUrls']:
                     aka_object.add_attribute('PMD', **{'type': 'url', 'value': item['url']})
             if k == 'createdDate':
-                aka_object.add_attribute('first-seen', **{'type': 'datetime', 'value': q[k]})
+                aka_object.add_attribute('first-seen', disable_correlation=True, **{'type': 'datetime', 'value': q[k]})
             if k == 'lastModifiedDate':
-                aka_object.add_attribute('last-seen', **{'type': 'datetime', 'value': q[k]})
+                aka_object.add_attribute('last-seen', disable_correlation=True, **{'type': 'datetime', 'value': q[k]})
             if k == 'threatInformation' and threatInfo == "":
                 threatIN = q['threatInformation']
                 tmpI = 0
@@ -134,9 +134,9 @@ class APIAKAOpenParser():
                             NEWTAGAPP="Threat:unknown"
 
                         ThreatTag.append(NEWTAGAPP)
-                        aka_object.add_attribute('Threat Info', type='text', value=threatInfo, Tag=ThreatTag)
+                        aka_object.add_attribute('Threat Info', type='text', value=threatInfo, Tag=ThreatTag, disable_correlation=True)
                         for link in d['externalLinks']:
-                            aka_object.add_attribute('reference', type='link', value=link, Tag=ThreatTag)
+                            aka_object.add_attribute('reference', type='link', value=link, Tag=ThreatTag, disable_correlation=True)
                         tmpI = item['threatId']
         if whois_info != "":
             to_Enrich += "\nWhois Information: \n" + whois_info + "\n"
@@ -147,11 +147,11 @@ class APIAKAOpenParser():
             changes_result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/changes?record=' + rrecord))
             changes = changes_result.json()
             for change in changes:
-                aka_object.add_attribute('timeline', **{'type': 'datetime', 'value': change['date'], 'comment': str(change["description"])})
+                aka_object.add_attribute('timeline', disable_correlation=True, **{'type': 'datetime', 'value': change['date'], 'comment': str(change["description"])})
         except Exception as e:
             log.info('Exception in custom info {}'.format(e))
 
-        aka_object.add_attribute('Domain Threat Info', type='text', value=to_Enrich, Tag=tagval)
+        aka_object.add_attribute('Domain Threat Info', type='text', value=to_Enrich, Tag=tagval, disable_correlation=True)
         self.misp_event.add_object(**aka_object)
         
      def _get_dns_info(self, rrecord):
@@ -180,7 +180,7 @@ class APIAKAOpenParser():
                     for el in _result['aggregations']:
                         name = el['name']
                         _text += f"{name} : {el['total']} connections \n"
-                    aka_cust_object.add_attribute('Customer Attribution', type='text', value=str(_text), Tag=tagInfo)
+                    aka_cust_object.add_attribute('Customer Attribution', type='text', value=str(_text), Tag=tagInfo, disable_correlation=True)
                  self.incident_flag = "true"
                  self.misp_event.add_object(**aka_cust_object)
 
