@@ -9,7 +9,7 @@ The MISP and Akamai integration empower SecOps teams access the Akamai enrichmen
 * ETP Intelligence license
 * Open API credentials
 * MISP Platform [installed](https://www.misp-project.org/download/#virtual-images)
-* Python 3.6 and above with [akamai.edgegrid](https://github.com/akamai/AkamaiOPEN-edgegrid-python) packedge installed
+* Python 3.6 and above with [akamai.edgegrid](https://github.com/akamai/AkamaiOPEN-edgegrid-python) package installed
 
 ## Installation
 
