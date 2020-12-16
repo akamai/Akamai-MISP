@@ -2,7 +2,7 @@
 """
 Module (type "expansion") from Akamai to provide IOC analysis.
 Date : 12/1/2020
-Authers: ["Shiran Guez","Jordan Garzon","Avishai Katz","Asaf Nadler"]
+Authors: ["Shiran Guez","Jordan Garzon","Avishai Katz","Asaf Nadler"]
 """
 import json
 import time
