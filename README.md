@@ -1,5 +1,5 @@
 # Akamai-MISP
-MISP Threat Sharing is an open source threat intelligence platform. The project develops utilities and documentation for more effective threat intelligence, by sharing indicators of compromise. The Akamai Project is to provide with Akamai Customer the ability to enrich threat intelligence digested by feeds and provide high value information.
+The MISP and Akamai integration empower SecOps teams access the Akamai enrichment module directly within MISP to curate IoC in a single location benefits of Akamai unique visibility and IoC attribution.
 
 
 
@@ -9,7 +9,7 @@ MISP Threat Sharing is an open source threat intelligence platform. The project 
 * ETP Intelligence license
 * Open API credentials
 * MISP Platform [installed](https://www.misp-project.org/download/#virtual-images)
-* Python 3.6 and above with [akamai.edgegrid](https://github.com/akamai/AkamaiOPEN-edgegrid-python) packedge installed
+* Python 3.6 and above with [akamai.edgegrid](https://github.com/akamai/AkamaiOPEN-edgegrid-python) package installed
 
 ## Installation
 
