@@ -28,6 +28,7 @@ misperrors = {
 mispattributes = {
     "input": [
         "domain",
+        "hostname",
     ],
     'format': 'misp_standard'
 }
@@ -214,9 +215,10 @@ def handler(q=False):
     atoken   = str(request['config']['access_token'])
     configID = str(request['config']['etp_config_id'])
     baseurl  = str(request['config']['apiURL'])
-    rrecord = str(attribute['value'])
+    rrecord = attribute['value'] if 'value' in attribute else attribute['value1']
     mapping = {
-            'domain': 'parse_domain'
+            'domain': 'parse_domain',
+            'hostname': 'parse_domain'
     }
     aka_parser = APIAKAOpenParser(ctoken, csecret, atoken, configID, baseurl, rrecord)
     attribute_value = attribute['value'] if 'value' in attribute else attribute['value1']
