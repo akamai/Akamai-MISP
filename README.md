@@ -22,7 +22,7 @@ Unless required by applicable law or agreed to in writing, Licensor provides the
 
 # MIT License
 
-Copyright (c) 2020 sguez
+Copyright (c) 2020 Akamai
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
