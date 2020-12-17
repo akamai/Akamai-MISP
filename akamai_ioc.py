@@ -65,6 +65,8 @@ class APIAKAOpenParser():
         access_token  = self.atoken
         )
         result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/information?record=' + rrecord))  
+        if result.status_code != 200:
+            raise Exception ("Akamai Open API return error: " + str(result.status_code))
         q = result.json()
         to_Enrich = ""
         whois_info = ""
@@ -198,6 +200,14 @@ def handler(q=False):
     if q is False:
         return False
     request  = json.loads(q)
+    if request.get('config'):
+        if (request['config']['client_token'] is '') \
+            or (request['config']['client_secret'] is '') \
+            or (request['config']['access_token'] is '') \
+            or (request['config']['etp_config_id'] is '') \
+            or (request['config']['apiURL'] is ''):
+            misperrors['error'] = "Akamai Open API credentials are missing"
+            return misperrors
     attribute = request['attribute']
     ctoken   = str(request['config']['client_token'])
     csecret  = str(request['config']['client_secret'])
