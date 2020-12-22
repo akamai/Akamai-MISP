@@ -14,6 +14,9 @@ The MISP and Akamai integration empower SecOps teams access the Akamai enrichmen
 ## Installation
 
 1. Add akamai_ioc.py to ${MISP_MODULES_BASE}/site-packages/misp_modules/modules/expansion/
+```
+cp /local/path/akamai_ioc.py ${MISP_MODULES_BASE}/site-packages/misp_modules/modules/expansion/
+```
 2. reload MISP modules 
 3. Configure Akamai credentials to MISP expansion module
 
