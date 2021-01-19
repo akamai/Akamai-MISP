@@ -20,7 +20,7 @@ cp /local/path/akamai_ioc.py ${MISP_MODULES_BASE}/site-packages/misp_modules/mod
 2. reload MISP modules 
 3. Configure Akamai credentials to MISP expansion module:
   * How to start with Akamai API https://developer.akamai.com/api/getting-started 
-  * Once you have the Akamai API credentials you will need to browse to you Plugin setup page https://<misp-server>/servers/serverSettings/Plugin
+  * Once you have the Akamai API credentials you will need to browse to you Plugin setup page https://{misp-server-hostname}/servers/serverSettings/Plugin
   * From the "Enrichment" search for akamai_ioc
   * Enter the detail information from the Akamai API
     * Enrichment_akamai_ioc_enabled
