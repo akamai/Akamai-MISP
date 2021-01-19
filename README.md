@@ -26,7 +26,7 @@ cp /local/path/akamai_ioc.py ${MISP_MODULES_BASE}/site-packages/misp_modules/mod
     * Enrichment_akamai_ioc_enabled
     * Enrichment_akamai_ioc_client_token from API client_token
     * Enrichment_akamai_ioc_access_token from API access_token
-    * Enrichment_akamai_ioc_apiURL from from API host , make sure to add https://<host>/
+    * Enrichment_akamai_ioc_apiURL from from API host , make sure to add https://{host}/
     * Enrichment_akamai_ioc_client_secret from API client_secret
     * Enrichment_akamai_ioc_enabled set to True
     * Enrichment_akamai_ioc_etp_config_id - Akamai customer config ID is a number represent the customer identfier can be viewed from multiple places in the luna control dashboard like from Utilities -> ETP Client Tab CUSTOMER IDENTIFIER: xxxxx
