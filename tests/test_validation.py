@@ -24,7 +24,7 @@ def test_domain_validation():
             return False, "Domain exceeds maximum length of 255 characters"
 
         domain_pattern = re.compile(
-            r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63}(?<!-))*\.?$'
+            r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63}(?<!-))*\.?$"
         )
 
         if not domain_pattern.match(domain):
@@ -38,7 +38,7 @@ def test_domain_validation():
         "subdomain.example.com",
         "test-domain.co.uk",
         "a.b.c.d.example.com",
-        "valid-domain-123.com"
+        "valid-domain-123.com",
     ]
 
     for domain in valid_domains:
@@ -69,7 +69,13 @@ def test_api_credentials_validation():
     from urllib.parse import urlparse
 
     def validate_api_credentials(config):
-        required_fields = ['client_token', 'client_secret', 'access_token', 'etp_config_id', 'apiURL']
+        required_fields = [
+            "client_token",
+            "client_secret",
+            "access_token",
+            "etp_config_id",
+            "apiURL",
+        ]
 
         for field in required_fields:
             if field not in config:
@@ -79,18 +85,18 @@ def test_api_credentials_validation():
             if not value or (isinstance(value, str) and not value.strip()):
                 return False, f"Field '{field}' cannot be empty"
 
-        apiURL = config['apiURL']
+        apiURL = config["apiURL"]
         try:
             parsed = urlparse(apiURL)
             if not parsed.scheme or not parsed.netloc:
                 return False, "apiURL must be a valid URL with scheme (https://)"
-            if parsed.scheme != 'https':
+            if parsed.scheme != "https":
                 return False, "apiURL must use HTTPS"
         except Exception as e:
             return False, f"Invalid apiURL format: {e!s}"
 
         try:
-            int(config['etp_config_id'])
+            int(config["etp_config_id"])
         except ValueError:
             return False, "etp_config_id must be a valid integer"
 
@@ -98,11 +104,11 @@ def test_api_credentials_validation():
 
     # Test valid config
     valid_config = {
-        'client_token': 'test_token',
-        'client_secret': 'test_secret',
-        'access_token': 'test_access',
-        'etp_config_id': '12345',
-        'apiURL': 'https://api.example.com/'
+        "client_token": "test_token",
+        "client_secret": "test_secret",
+        "access_token": "test_access",
+        "etp_config_id": "12345",
+        "apiURL": "https://api.example.com/",
     }
 
     is_valid, error = validate_api_credentials(valid_config)
@@ -110,10 +116,7 @@ def test_api_credentials_validation():
     print("✓ Valid config - PASSED")
 
     # Test missing field
-    incomplete_config = {
-        'client_token': 'test_token',
-        'client_secret': 'test_secret'
-    }
+    incomplete_config = {"client_token": "test_token", "client_secret": "test_secret"}
     is_valid, error = validate_api_credentials(incomplete_config)
     assert not is_valid, "Expected incomplete config to fail"
     assert "Missing required field" in error
@@ -121,7 +124,7 @@ def test_api_credentials_validation():
 
     # Test empty value
     empty_config = valid_config.copy()
-    empty_config['client_token'] = ''
+    empty_config["client_token"] = ""
     is_valid, error = validate_api_credentials(empty_config)
     assert not is_valid, "Expected empty value to fail"
     assert "cannot be empty" in error
@@ -129,7 +132,7 @@ def test_api_credentials_validation():
 
     # Test non-HTTPS URL
     http_config = valid_config.copy()
-    http_config['apiURL'] = 'http://api.example.com/'
+    http_config["apiURL"] = "http://api.example.com/"
     is_valid, error = validate_api_credentials(http_config)
     assert not is_valid, "Expected HTTP URL to fail"
     assert "HTTPS" in error
@@ -137,7 +140,7 @@ def test_api_credentials_validation():
 
     # Test invalid config ID
     invalid_id_config = valid_config.copy()
-    invalid_id_config['etp_config_id'] = 'not_a_number'
+    invalid_id_config["etp_config_id"] = "not_a_number"
     is_valid, error = validate_api_credentials(invalid_id_config)
     assert not is_valid, "Expected non-numeric config ID to fail"
     assert "integer" in error
@@ -163,7 +166,11 @@ def test_api_response_validation():
         elif response.status_code == 401:
             return False, f"{endpoint_name}: Authentication failed - check API credentials", None
         elif response.status_code == 403:
-            return False, f"{endpoint_name}: Access forbidden - check permissions and config ID", None
+            return (
+                False,
+                f"{endpoint_name}: Access forbidden - check permissions and config ID",
+                None,
+            )
         elif response.status_code == 404:
             return False, f"{endpoint_name}: Resource not found", None
         elif response.status_code == 429:
@@ -176,11 +183,11 @@ def test_api_response_validation():
     # Test successful response
     mock_response = Mock()
     mock_response.status_code = 200
-    mock_response.json.return_value = {'data': 'test'}
+    mock_response.json.return_value = {"data": "test"}
 
-    is_valid, error, data = validate_api_response(mock_response, 'Test')
+    is_valid, error, data = validate_api_response(mock_response, "Test")
     assert is_valid, "Expected 200 response to be valid"
-    assert data == {'data': 'test'}
+    assert data == {"data": "test"}
     print("✓ 200 OK - VALID")
 
     # Test various error codes
@@ -190,13 +197,13 @@ def test_api_response_validation():
         (403, "Access forbidden"),
         (404, "Resource not found"),
         (429, "Rate limit"),
-        (500, "Server error")
+        (500, "Server error"),
     ]
 
     for code, expected_msg in error_codes:
         mock_response = Mock()
         mock_response.status_code = code
-        is_valid, error, data = validate_api_response(mock_response, 'Test')
+        is_valid, error, data = validate_api_response(mock_response, "Test")
         assert not is_valid, f"Expected {code} to be invalid"
         assert expected_msg in error or str(code) in error
         print(f"✓ {code} - INVALID as expected ({expected_msg})")
@@ -204,7 +211,7 @@ def test_api_response_validation():
     print("\nAll API response validation tests passed!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("Running Akamai IOC Validation Tests\n")
     print("=" * 50)
     print("\n1. Testing Domain Validation")

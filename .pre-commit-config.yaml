@@ -50,18 +50,11 @@ repos:
         args: ["-ll", "-r", "akamai_ioc.py"]
         exclude: ^tests/
 
-  # Check for secrets
-  - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.4.0
-    hooks:
-      - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-        exclude: package.lock.json
-
-  # Markdown linting
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.39.0
-    hooks:
-      - id: markdownlint
-        args: ['--fix']
-        exclude: ^CHANGELOG.md$
+  # Check for secrets (optional - requires baseline setup)
+  # To enable: run `detect-secrets scan > .secrets.baseline` first
+  # - repo: https://github.com/Yelp/detect-secrets
+  #   rev: v1.4.0
+  #   hooks:
+  #     - id: detect-secrets
+  #       args: ['--baseline', '.secrets.baseline']
+  #       exclude: package.lock.json

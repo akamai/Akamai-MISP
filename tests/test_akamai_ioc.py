@@ -43,11 +43,11 @@ class TestValidationFunctions:
         from misp_modules.modules.expansion import akamai_ioc
 
         valid_config = {
-            'client_token': 'test_token',
-            'client_secret': 'test_secret',
-            'access_token': 'test_access',
-            'etp_config_id': '12345',
-            'apiURL': 'https://api.example.com/'
+            "client_token": "test_token",
+            "client_secret": "test_secret",
+            "access_token": "test_access",
+            "etp_config_id": "12345",
+            "apiURL": "https://api.example.com/",
         }
 
         is_valid, error = akamai_ioc.validate_api_credentials(valid_config)
@@ -59,8 +59,8 @@ class TestValidationFunctions:
         from misp_modules.modules.expansion import akamai_ioc
 
         incomplete_config = {
-            'client_token': 'test_token',
-            'client_secret': 'test_secret'
+            "client_token": "test_token",
+            "client_secret": "test_secret",
             # Missing other required fields
         }
 
@@ -73,11 +73,11 @@ class TestValidationFunctions:
         from misp_modules.modules.expansion import akamai_ioc
 
         config_with_empty = {
-            'client_token': '',
-            'client_secret': 'test_secret',
-            'access_token': 'test_access',
-            'etp_config_id': '12345',
-            'apiURL': 'https://api.example.com/'
+            "client_token": "",
+            "client_secret": "test_secret",
+            "access_token": "test_access",
+            "etp_config_id": "12345",
+            "apiURL": "https://api.example.com/",
         }
 
         is_valid, error = akamai_ioc.validate_api_credentials(config_with_empty)
@@ -90,11 +90,11 @@ class TestValidationFunctions:
 
         # Non-HTTPS URL
         config = {
-            'client_token': 'test_token',
-            'client_secret': 'test_secret',
-            'access_token': 'test_access',
-            'etp_config_id': '12345',
-            'apiURL': 'http://api.example.com/'  # HTTP instead of HTTPS
+            "client_token": "test_token",
+            "client_secret": "test_secret",
+            "access_token": "test_access",
+            "etp_config_id": "12345",
+            "apiURL": "http://api.example.com/",  # HTTP instead of HTTPS
         }
 
         is_valid, error = akamai_ioc.validate_api_credentials(config)
@@ -106,11 +106,11 @@ class TestValidationFunctions:
         from misp_modules.modules.expansion import akamai_ioc
 
         config = {
-            'client_token': 'test_token',
-            'client_secret': 'test_secret',
-            'access_token': 'test_access',
-            'etp_config_id': 'not_a_number',
-            'apiURL': 'https://api.example.com/'
+            "client_token": "test_token",
+            "client_secret": "test_secret",
+            "access_token": "test_access",
+            "etp_config_id": "not_a_number",
+            "apiURL": "https://api.example.com/",
         }
 
         is_valid, error = akamai_ioc.validate_api_credentials(config)
@@ -127,12 +127,12 @@ class TestAPIResponseValidation:
 
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {'data': 'test'}
+        mock_response.json.return_value = {"data": "test"}
 
-        is_valid, error, data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, data = akamai_ioc.validate_api_response(mock_response, "Test Endpoint")
         assert is_valid is True
         assert error is None
-        assert data == {'data': 'test'}
+        assert data == {"data": "test"}
 
     def test_validate_api_response_400(self):
         """Test 400 Bad Request"""
@@ -141,7 +141,7 @@ class TestAPIResponseValidation:
         mock_response = Mock()
         mock_response.status_code = 400
 
-        is_valid, error, data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, data = akamai_ioc.validate_api_response(mock_response, "Test Endpoint")
         assert is_valid is False
         assert "Bad request" in error
         assert data is None
@@ -153,7 +153,7 @@ class TestAPIResponseValidation:
         mock_response = Mock()
         mock_response.status_code = 401
 
-        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, "Test Endpoint")
         assert is_valid is False
         assert "Authentication failed" in error
 
@@ -164,7 +164,7 @@ class TestAPIResponseValidation:
         mock_response = Mock()
         mock_response.status_code = 403
 
-        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, "Test Endpoint")
         assert is_valid is False
         assert "Access forbidden" in error
 
@@ -175,7 +175,7 @@ class TestAPIResponseValidation:
         mock_response = Mock()
         mock_response.status_code = 429
 
-        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, "Test Endpoint")
         assert is_valid is False
         assert "Rate limit" in error
 
@@ -194,64 +194,63 @@ class TestHandlerFunction:
         """Test handler with missing configuration"""
         from misp_modules.modules.expansion import akamai_ioc
 
-        request = json.dumps({
-            'attribute': {
-                'type': 'domain',
-                'value': 'example.com'
-            }
-        })
+        request = json.dumps({"attribute": {"type": "domain", "value": "example.com"}})
 
         result = akamai_ioc.handler(request)
-        assert 'error' in result
-        assert 'Missing configuration' in result['error']
+        assert "error" in result
+        assert "Missing configuration" in result["error"]
 
     def test_handler_invalid_json(self):
         """Test handler with invalid JSON"""
         from misp_modules.modules.expansion import akamai_ioc
 
         result = akamai_ioc.handler("invalid json {")
-        assert 'error' in result
-        assert 'Invalid JSON' in result['error']
+        assert "error" in result
+        assert "Invalid JSON" in result["error"]
 
     def test_handler_missing_attribute(self):
         """Test handler with missing attribute"""
         from misp_modules.modules.expansion import akamai_ioc
 
-        request = json.dumps({
-            'config': {
-                'client_token': 'test',
-                'client_secret': 'test',
-                'access_token': 'test',
-                'etp_config_id': '12345',
-                'apiURL': 'https://api.example.com/'
+        request = json.dumps(
+            {
+                "config": {
+                    "client_token": "test",
+                    "client_secret": "test",
+                    "access_token": "test",
+                    "etp_config_id": "12345",
+                    "apiURL": "https://api.example.com/",
+                }
             }
-        })
+        )
 
         result = akamai_ioc.handler(request)
-        assert 'error' in result
-        assert 'Missing attribute' in result['error']
+        assert "error" in result
+        assert "Missing attribute" in result["error"]
 
     def test_handler_unsupported_attribute_type(self):
         """Test handler with unsupported attribute type"""
         from misp_modules.modules.expansion import akamai_ioc
 
-        request = json.dumps({
-            'config': {
-                'client_token': 'test',
-                'client_secret': 'test',
-                'access_token': 'test',
-                'etp_config_id': '12345',
-                'apiURL': 'https://api.example.com/'
-            },
-            'attribute': {
-                'type': 'ip-addr',  # Unsupported type
-                'value': '1.2.3.4'
+        request = json.dumps(
+            {
+                "config": {
+                    "client_token": "test",
+                    "client_secret": "test",
+                    "access_token": "test",
+                    "etp_config_id": "12345",
+                    "apiURL": "https://api.example.com/",
+                },
+                "attribute": {
+                    "type": "ip-addr",  # Unsupported type
+                    "value": "1.2.3.4",
+                },
             }
-        })
+        )
 
         result = akamai_ioc.handler(request)
-        assert 'error' in result
-        assert 'Unsupported attribute type' in result['error']
+        assert "error" in result
+        assert "Unsupported attribute type" in result["error"]
 
 
 class TestModuleInfo:
@@ -262,28 +261,28 @@ class TestModuleInfo:
         from misp_modules.modules.expansion import akamai_ioc
 
         result = akamai_ioc.introspection()
-        assert 'input' in result
-        assert 'domain' in result['input']
-        assert 'hostname' in result['input']
-        assert result['format'] == 'misp_standard'
+        assert "input" in result
+        assert "domain" in result["input"]
+        assert "hostname" in result["input"]
+        assert result["format"] == "misp_standard"
 
     def test_version(self):
         """Test version function returns module info"""
         from misp_modules.modules.expansion import akamai_ioc
 
         result = akamai_ioc.version()
-        assert 'version' in result
-        assert 'author' in result
-        assert 'description' in result
-        assert 'module-type' in result
-        assert 'config' in result
-        assert 'expansion' in result['module-type']
+        assert "version" in result
+        assert "author" in result
+        assert "description" in result
+        assert "module-type" in result
+        assert "config" in result
+        assert "expansion" in result["module-type"]
 
 
 @pytest.fixture
 def mock_akamai_session():
     """Fixture to mock Akamai API session"""
-    with patch('misp_modules.modules.expansion.akamai_ioc.requests.Session') as mock_session:
+    with patch("misp_modules.modules.expansion.akamai_ioc.requests.Session") as mock_session:
         session_instance = MagicMock()
         mock_session.return_value = session_instance
         yield session_instance
@@ -308,5 +307,5 @@ class TestIntegration:
         pass
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
