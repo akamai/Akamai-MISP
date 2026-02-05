@@ -2,8 +2,8 @@
 Standalone validation tests for Akamai IOC module
 These tests can run independently of MISP modules environment
 """
-import sys
 import os
+import sys
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,7 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def test_domain_validation():
     """Test domain validation function"""
     import re
-    from urllib.parse import urlparse
 
     # Replicate the validation logic for testing
     def validate_domain(domain):
@@ -88,7 +87,7 @@ def test_api_credentials_validation():
             if parsed.scheme != 'https':
                 return False, "apiURL must use HTTPS"
         except Exception as e:
-            return False, f"Invalid apiURL format: {str(e)}"
+            return False, f"Invalid apiURL format: {e!s}"
 
         try:
             int(config['etp_config_id'])
@@ -149,8 +148,8 @@ def test_api_credentials_validation():
 
 def test_api_response_validation():
     """Test API response validation"""
-    from unittest.mock import Mock
     import json as json_module
+    from unittest.mock import Mock
 
     def validate_api_response(response, endpoint_name):
         if response.status_code == 200:
@@ -158,7 +157,7 @@ def test_api_response_validation():
                 data = response.json()
                 return True, None, data
             except json_module.JSONDecodeError as e:
-                return False, f"{endpoint_name}: Invalid JSON response - {str(e)}", None
+                return False, f"{endpoint_name}: Invalid JSON response - {e!s}", None
         elif response.status_code == 400:
             return False, f"{endpoint_name}: Bad request - check input parameters", None
         elif response.status_code == 401:

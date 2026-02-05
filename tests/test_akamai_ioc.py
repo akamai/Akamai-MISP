@@ -2,9 +2,10 @@
 Unit tests for Akamai IOC MISP module
 """
 import json
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
 import responses
-from unittest.mock import Mock, patch, MagicMock
 
 # Note: These tests assume the module is installed in MISP modules path
 # For standalone testing, you may need to adjust the import path
@@ -152,7 +153,7 @@ class TestAPIResponseValidation:
         mock_response = Mock()
         mock_response.status_code = 401
 
-        is_valid, error, data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
         assert is_valid is False
         assert "Authentication failed" in error
 
@@ -163,7 +164,7 @@ class TestAPIResponseValidation:
         mock_response = Mock()
         mock_response.status_code = 403
 
-        is_valid, error, data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
         assert is_valid is False
         assert "Access forbidden" in error
 
@@ -174,7 +175,7 @@ class TestAPIResponseValidation:
         mock_response = Mock()
         mock_response.status_code = 429
 
-        is_valid, error, data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
+        is_valid, error, _data = akamai_ioc.validate_api_response(mock_response, 'Test Endpoint')
         assert is_valid is False
         assert "Rate limit" in error
 
@@ -294,36 +295,16 @@ class TestIntegration:
     @responses.activate
     def test_successful_domain_enrichment(self, mock_akamai_session):
         """Test successful domain enrichment flow"""
-        from misp_modules.modules.expansion import akamai_ioc
-
-        # Mock API responses
-        ioc_info_response = {
-            'record': 'malicious.com',
-            'recordType': 'domain',
-            'description': 'Known malicious domain',
-            'categories': ['malware'],
-            'registrantName': 'Bad Actor',
-            'createdDate': '2024-01-01T00:00:00Z',
-            'threatInformation': []
-        }
-
-        request = json.dumps({
-            'config': {
-                'client_token': 'test_token',
-                'client_secret': 'test_secret',
-                'access_token': 'test_access',
-                'etp_config_id': '12345',
-                'apiURL': 'https://api.example.com/'
-            },
-            'attribute': {
-                'type': 'domain',
-                'value': 'malicious.com'
-            }
-        })
 
         # This test requires full integration setup
         # For now, we verify the request structure is valid
         # Full integration tests would require MISP modules environment
+
+        # Example of what would be mocked:
+        # Mock API responses for IOC information, threat metadata, etc.
+        # Create test request with config and attribute
+        # Call handler and verify response structure
+
         pass
 
 

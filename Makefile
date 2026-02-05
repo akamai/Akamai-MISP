@@ -10,48 +10,52 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 install: ## Install production dependencies
-	pip install -e .
+	pip3 install -e .
 
 dev-install: ## Install development dependencies
-	pip install -e ".[dev]"
+	pip3 install -e ".[dev]"
 	@echo "✓ Development dependencies installed"
 	@echo "Run 'make pre-commit-install' to set up pre-commit hooks"
 
-test: ## Run all tests with coverage
-	pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=html
+test: ## Run all tests with coverage (requires MISP modules)
+	python3 -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=html
 	@echo "✓ Coverage report generated in htmlcov/index.html"
 
+test-standalone: ## Run standalone validation tests (no MISP modules required)
+	python3 tests/test_validation.py
+	@echo "✓ Standalone validation tests passed"
+
 test-unit: ## Run only unit tests
-	pytest tests/ -v -m "not integration"
+	python3 -m pytest tests/ -v -m "not integration"
 
 test-integration: ## Run only integration tests
-	pytest tests/ -v -m integration
+	python3 -m pytest tests/ -v -m integration
 
 lint: ## Run linting checks (ruff, mypy)
 	@echo "Running ruff..."
-	ruff check akamai_ioc.py tests/
+	python3 -m ruff check akamai_ioc.py tests/
 	@echo "Running mypy..."
-	mypy akamai_ioc.py
+	python3 -m mypy akamai_ioc.py
 	@echo "✓ Linting passed"
 
 format: ## Format code with ruff
-	ruff format akamai_ioc.py tests/
+	python3 -m ruff format akamai_ioc.py tests/
 	@echo "✓ Code formatted"
 
 security-scan: ## Run security scans (bandit)
 	@echo "Running bandit security scan..."
-	bandit -r akamai_ioc.py -ll
+	python3 -m bandit -r akamai_ioc.py -ll
 	@echo "✓ Security scan complete"
 
-validate: lint security-scan test ## Run full validation (lint + security + tests)
+validate: lint security-scan test-standalone ## Run full validation (lint + security + standalone tests)
 	@echo "✓ Full validation passed"
 
 pre-commit-install: ## Install pre-commit hooks
-	pre-commit install
+	python3 -m pre_commit install
 	@echo "✓ Pre-commit hooks installed"
 
 pre-commit-run: ## Run pre-commit hooks on all files
-	pre-commit run --all-files
+	python3 -m pre_commit run --all-files
 
 clean: ## Clean build artifacts and cache
 	rm -rf build/ dist/ *.egg-info/
@@ -64,11 +68,11 @@ clean: ## Clean build artifacts and cache
 	@echo "✓ Cleaned build artifacts and cache"
 
 check-deps: ## Check for outdated dependencies
-	pip list --outdated
+	pip3 list --outdated
 
 update-deps: ## Update dependencies (use with caution)
-	pip install --upgrade pip
-	pip install --upgrade -r requirements.txt -r requirements-dev.txt
+	pip3 install --upgrade pip
+	pip3 install --upgrade -r requirements.txt -r requirements-dev.txt
 
 # MISP-specific targets
 validate-module: ## Validate module before deployment

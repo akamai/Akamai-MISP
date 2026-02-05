@@ -6,17 +6,17 @@ Authors: ["Shiran Guez","Jordan Garzon","Avishai Katz","Asaf Nadler"]
 Updated: 2026 - Added v3 API support, validation, and testing
 """
 import json
-import time
-import re
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-from urllib.parse import urljoin, urlparse
-from akamai.edgegrid import EdgeGridAuth
-from . import check_input_attribute, checking_error, standard_error_message
-from pymisp import MISPAttribute, MISPEvent, MISPObject
 import logging
 import logging.handlers
+import re
+import time
+from urllib.parse import urljoin, urlparse
+
+import requests
+from akamai.edgegrid import EdgeGridAuth
+from pymisp import MISPEvent, MISPObject
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logging.basicConfig(filename='akamai.log',
                     filemode='a',
@@ -194,7 +194,7 @@ def validate_api_credentials(config):
         if parsed.scheme != 'https':
             return False, "apiURL must use HTTPS"
     except Exception as e:
-        return False, f"Invalid apiURL format: {str(e)}"
+        return False, f"Invalid apiURL format: {e!s}"
 
     # Validate config ID is numeric
     try:
@@ -221,7 +221,7 @@ def validate_api_response(response, endpoint_name):
             data = response.json()
             return True, None, data
         except json.JSONDecodeError as e:
-            return False, f"{endpoint_name}: Invalid JSON response - {str(e)}", None
+            return False, f"{endpoint_name}: Invalid JSON response - {e!s}", None
     elif response.status_code == 400:
         return False, f"{endpoint_name}: Bad request - check input parameters", None
     elif response.status_code == 401:
@@ -238,7 +238,7 @@ def validate_api_response(response, endpoint_name):
         return False, f"{endpoint_name}: Unexpected status code {response.status_code}", None
 
 
-class APIAKAOpenParser():
+class APIAKAOpenParser:
      def __init__(self, ctoken, csecret, atoken, configID, baseurl, rrecord):
         self.misp_event = MISPEvent()
         self.ctoken = ctoken
@@ -250,7 +250,7 @@ class APIAKAOpenParser():
 
      def get_results(self):
         event = json.loads(self.misp_event.to_json())
-        results = {key: event[key] for key in ('Attribute', 'Object') if (key in event and event[key])}
+        results = {key: event[key] for key in ('Attribute', 'Object') if (event.get(key))}
         return {'results': results}
 
      def parse_domain(self, rrecord):
@@ -277,8 +277,6 @@ class APIAKAOpenParser():
         to_Enrich = ""
         whois_info = ""
         urlList = ""
-        incident_flag = "false"
-        commentval = "Akamai IOC enrich"
         self._get_dns_info(rrecord)
         try:
             if self.incident_flag == "true":
@@ -289,7 +287,7 @@ class APIAKAOpenParser():
             # incident_flag not set, use default tag
             tagval = ["source:AkamaiETP"]
         threatInfo = ""
-        for (k, v) in q.items():
+        for (k, _v) in q.items():
             if k == 'record':
                 to_Enrich += str(q[k]) + "\n"
             if k == 'recordType':
@@ -350,7 +348,7 @@ class APIAKAOpenParser():
                                 NEWTAGAPP="Threat:unknown"
                         except (KeyError, TypeError) as e:
                             # Missing or invalid threat data fields
-                            log.debug(f"Unable to extract threat tag: {str(e)}")
+                            log.debug(f"Unable to extract threat tag: {e!s}")
                             NEWTAGAPP="Threat:unknown"
 
                         ThreatTag.append(NEWTAGAPP)
@@ -362,7 +360,7 @@ class APIAKAOpenParser():
             to_Enrich += "\nWhois Information: \n" + whois_info + "\n"
         if urlList != "":
             to_Enrich += "\nURL list: \n" + urlList + "\n"
-        
+
         try:
             changes_result = session.get(
                 urljoin(self.baseurl, '/etp-report/v3/ioc/changes?record=' + rrecord),
@@ -375,11 +373,11 @@ class APIAKAOpenParser():
             else:
                 log.info(f'Could not get IOC changes: {error_msg}')
         except Exception as e:
-            log.info('Exception getting IOC changes: {}'.format(e))
+            log.info(f'Exception getting IOC changes: {e}')
 
         aka_object.add_attribute('Domain Threat Info', type='text', value=to_Enrich, Tag=tagval, disable_correlation=True)
         self.misp_event.add_object(**aka_object)
-        
+
      def _get_dns_info(self, rrecord):
         aka_cust_object = MISPObject('misc')
         tagInfo=["source:AkamaiETP"]
@@ -392,7 +390,7 @@ class APIAKAOpenParser():
             confID = self.configID
             epoch_time = int(time.time())
             last_30_days = epoch_time - 3600 * 24 * 30  # last month by default for now
-            url = f'/etp-report/v3/configs/{str(confID)}' + \
+            url = f'/etp-report/v3/configs/{confID!s}' + \
                   f'/dns-activities/aggregate?cardinality=2500&dimension={dimension}&endTimeSec={epoch_time}&filters' + \
                   f'=%7B%22domain%22:%7B%22in%22:%5B%22{rrecord}%22%5D%7D%7D&startTimeSec={last_30_days}'
             dns_response = session.get(urljoin(self.baseurl, url), timeout=API_TIMEOUT)
@@ -427,7 +425,7 @@ def handler(q=False):
     try:
         request = json.loads(q)
     except json.JSONDecodeError as e:
-        misperrors['error'] = f"Invalid JSON input: {str(e)}"
+        misperrors['error'] = f"Invalid JSON input: {e!s}"
         return misperrors
 
     # Validate configuration
@@ -479,12 +477,12 @@ def handler(q=False):
         getattr(aka_parser, mapping[attribute['type']])(attribute_value)
         return aka_parser.get_results()
     except ValueError as e:
-        misperrors['error'] = f"Validation error: {str(e)}"
-        log.error(f"Validation error: {str(e)}")
+        misperrors['error'] = f"Validation error: {e!s}"
+        log.error(f"Validation error: {e!s}")
         return misperrors
     except Exception as e:
-        misperrors['error'] = f"Processing error: {str(e)}"
-        log.error(f"Processing error: {str(e)}")
+        misperrors['error'] = f"Processing error: {e!s}"
+        log.error(f"Processing error: {e!s}")
         return misperrors
 
 
