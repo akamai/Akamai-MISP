@@ -9,6 +9,8 @@ import json
 import time
 import re
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from urllib.parse import urljoin, urlparse
 from akamai.edgegrid import EdgeGridAuth
 from . import check_input_attribute, checking_error, standard_error_message
@@ -43,6 +45,92 @@ moduleinfo = {
 }
 
 moduleconfig = ['client_secret', 'apiURL', 'access_token', 'client_token', 'etp_config_id']
+
+
+# Custom Exception Hierarchy
+class AkamaiMISPError(Exception):
+    """Base exception for Akamai MISP module errors"""
+    pass
+
+
+class ValidationError(AkamaiMISPError):
+    """Raised when input validation fails"""
+    def __init__(self, field, message):
+        self.field = field
+        self.message = message
+        super().__init__(f"Validation error for {field}: {message}")
+
+
+class APIError(AkamaiMISPError):
+    """Raised when API request fails"""
+    def __init__(self, endpoint, status_code, message):
+        self.endpoint = endpoint
+        self.status_code = status_code
+        self.message = message
+        super().__init__(f"API error at {endpoint} ({status_code}): {message}")
+
+
+class AuthenticationError(APIError):
+    """Raised when API authentication fails (401)"""
+    pass
+
+
+class RateLimitError(APIError):
+    """Raised when API rate limit is exceeded (429)"""
+    pass
+
+
+# API Configuration Constants
+API_TIMEOUT = 30  # Request timeout in seconds
+API_MAX_RETRIES = 3  # Maximum number of retries
+API_BACKOFF_FACTOR = 1  # Exponential backoff factor (wait 1s, 2s, 4s, etc.)
+
+
+def create_resilient_session(client_token, client_secret, access_token):
+    """
+    Create HTTP session with retry logic, timeout configuration, and connection pooling.
+
+    Implements exponential backoff retry strategy for transient failures.
+    Follows api-client-development skill guidelines for resilience.
+
+    Args:
+        client_token: Akamai API client token
+        client_secret: Akamai API client secret
+        access_token: Akamai API access token
+
+    Returns:
+        requests.Session: Configured session with retry logic
+    """
+    session = requests.Session()
+
+    # Configure retry strategy with exponential backoff
+    retry_strategy = Retry(
+        total=API_MAX_RETRIES,
+        backoff_factor=API_BACKOFF_FACTOR,
+        status_forcelist=[429, 500, 502, 503, 504],  # Retry on these HTTP status codes
+        allowed_methods=["GET"],  # Only retry safe GET requests
+        raise_on_status=False,  # Don't raise exceptions, let our code handle status codes
+    )
+
+    # Configure HTTP adapter with retry strategy and connection pooling
+    adapter = HTTPAdapter(
+        max_retries=retry_strategy,
+        pool_connections=10,  # Connection pool size
+        pool_maxsize=10,  # Maximum pool size
+    )
+
+    # Mount adapter for HTTPS requests
+    session.mount("https://", adapter)
+
+    # Configure Akamai EdgeGrid authentication
+    session.auth = EdgeGridAuth(
+        client_token=client_token,
+        client_secret=client_secret,
+        access_token=access_token
+    )
+
+    log.debug("Created resilient HTTP session with retry logic and connection pooling")
+    return session
 
 
 def validate_domain(domain):
@@ -173,15 +261,15 @@ class APIAKAOpenParser():
             raise ValueError(f"Invalid domain: {error_msg}")
 
         aka_object = MISPObject('Akamai IOC enrich')
-        session  = requests.Session()
-        session.auth = EdgeGridAuth(
-        client_token  = self.ctoken,
-        client_secret = self.csecret,
-        access_token  = self.atoken
-        )
 
-        # Get IOC information with validation
-        result = session.get(urljoin(self.baseurl, '/etp-report/v3/ioc/information?record=' + rrecord))
+        # Create resilient session with retry logic and timeout
+        session = create_resilient_session(self.ctoken, self.csecret, self.atoken)
+
+        # Get IOC information with validation and timeout
+        result = session.get(
+            urljoin(self.baseurl, '/etp-report/v3/ioc/information?record=' + rrecord),
+            timeout=API_TIMEOUT
+        )
         is_valid, error_msg, q = validate_api_response(result, 'IOC Information')
         if not is_valid:
             log.error(f"API error: {error_msg}")
@@ -197,7 +285,8 @@ class APIAKAOpenParser():
                 tagval = ["AkamaiETP:incident-classification=incident"]
             else:
                 tagval = ["source:AkamaiETP"]
-        except:
+        except AttributeError:
+            # incident_flag not set, use default tag
             tagval = ["source:AkamaiETP"]
         threatInfo = ""
         for (k, v) in q.items():
@@ -243,18 +332,25 @@ class APIAKAOpenParser():
                 for item in threatIN:
                     if item['threatId'] != tmpI:
                         # Note: v3 API uses /threats/threat-meta endpoint. May need threatId as query parameter
-                        addresult = session.get(urljoin(self.baseurl, '/etp-report/v3/configs/' + str(self.configID) + '/threats/threat-meta?threatId=' + str(item['threatId'])))
+                        addresult = session.get(
+                            urljoin(self.baseurl, '/etp-report/v3/configs/' + str(self.configID) + '/threats/threat-meta?threatId=' + str(item['threatId'])),
+                            timeout=API_TIMEOUT
+                        )
                         is_valid, error_msg, d = validate_api_response(addresult, 'Threat Metadata')
                         if not is_valid:
                             log.warning(f"Failed to get threat metadata for {item['threatId']}: {error_msg}")
                             continue
                         threatInfo = "\nThreat Name: " + str(d['threatName']) + "\nDescription: " + str(d['description'] + " ")
                         try:
-                            if d['familyName'] != "" and d['threatName'] != "":
+                            if d.get('familyName') and d.get('threatName'):
                                 NEWTAGAPP="misp-galaxy:"+d['familyName']+'="'+d['threatName']+'"'
-                            else:
+                            elif d.get('threatName'):
                                 NEWTAGAPP="Threat:"+d['threatName']
-                        except:
+                            else:
+                                NEWTAGAPP="Threat:unknown"
+                        except (KeyError, TypeError) as e:
+                            # Missing or invalid threat data fields
+                            log.debug(f"Unable to extract threat tag: {str(e)}")
                             NEWTAGAPP="Threat:unknown"
 
                         ThreatTag.append(NEWTAGAPP)
@@ -268,7 +364,10 @@ class APIAKAOpenParser():
             to_Enrich += "\nURL list: \n" + urlList + "\n"
         
         try:
-            changes_result = session.get(urljoin(self.baseurl, '/etp-report/v3/ioc/changes?record=' + rrecord))
+            changes_result = session.get(
+                urljoin(self.baseurl, '/etp-report/v3/ioc/changes?record=' + rrecord),
+                timeout=API_TIMEOUT
+            )
             is_valid, error_msg, changes = validate_api_response(changes_result, 'IOC Changes')
             if is_valid and changes:
                 for change in changes:
@@ -285,22 +384,18 @@ class APIAKAOpenParser():
         aka_cust_object = MISPObject('misc')
         tagInfo=["source:AkamaiETP"]
         _text = ""
+        # Create resilient session once for all DNS activity requests
+        session = create_resilient_session(self.ctoken, self.csecret, self.atoken)
+
         dimensions = ['deviceId','site']
         for dimension in dimensions:
-            #_result = self._run_custom_request(self, rrecord, dimension)
-            session  = requests.Session()
-            session.auth = EdgeGridAuth(
-               client_token  = self.ctoken,
-               client_secret = self.csecret,
-               access_token  = self.atoken
-            )
             confID = self.configID
             epoch_time = int(time.time())
             last_30_days = epoch_time - 3600 * 24 * 30  # last month by default for now
             url = f'/etp-report/v3/configs/{str(confID)}' + \
                   f'/dns-activities/aggregate?cardinality=2500&dimension={dimension}&endTimeSec={epoch_time}&filters' + \
                   f'=%7B%22domain%22:%7B%22in%22:%5B%22{rrecord}%22%5D%7D%7D&startTimeSec={last_30_days}'
-            dns_response = session.get(urljoin(self.baseurl, url))
+            dns_response = session.get(urljoin(self.baseurl, url), timeout=API_TIMEOUT)
             is_valid, error_msg, _result = validate_api_response(dns_response, f'DNS Activities ({dimension})')
             if not is_valid:
                 log.warning(f"DNS activities API error for dimension {dimension}: {error_msg}")
