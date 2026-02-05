@@ -3,11 +3,13 @@
 Module (type "expansion") from Akamai to provide IOC analysis.
 Date : 12/1/2020
 Authors: ["Shiran Guez","Jordan Garzon","Avishai Katz","Asaf Nadler"]
+Updated: 2026 - Added v3 API support, validation, and testing
 """
 import json
 import time
+import re
 import requests
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from akamai.edgegrid import EdgeGridAuth
 from . import check_input_attribute, checking_error, standard_error_message
 from pymisp import MISPAttribute, MISPEvent, MISPObject
@@ -42,6 +44,112 @@ moduleinfo = {
 
 moduleconfig = ['client_secret', 'apiURL', 'access_token', 'client_token', 'etp_config_id']
 
+
+def validate_domain(domain):
+    """
+    Validate domain/hostname format.
+
+    Args:
+        domain: Domain or hostname string to validate
+
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not domain or not isinstance(domain, str):
+        return False, "Domain must be a non-empty string"
+
+    domain = domain.strip()
+
+    # Check length
+    if len(domain) > 255:
+        return False, "Domain exceeds maximum length of 255 characters"
+
+    # Basic domain pattern validation (RFC 1035)
+    # Allows: letters, numbers, hyphens, dots
+    # Must not start or end with hyphen or dot
+    domain_pattern = re.compile(
+        r'^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63}(?<!-))*\.?$'
+    )
+
+    if not domain_pattern.match(domain):
+        return False, "Invalid domain format"
+
+    return True, None
+
+
+def validate_api_credentials(config):
+    """
+    Validate Akamai API credentials.
+
+    Args:
+        config: Dictionary containing API credentials
+
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    required_fields = ['client_token', 'client_secret', 'access_token', 'etp_config_id', 'apiURL']
+
+    for field in required_fields:
+        if field not in config:
+            return False, f"Missing required field: {field}"
+
+        value = config[field]
+        if not value or (isinstance(value, str) and not value.strip()):
+            return False, f"Field '{field}' cannot be empty"
+
+    # Validate URL format
+    apiURL = config['apiURL']
+    try:
+        parsed = urlparse(apiURL)
+        if not parsed.scheme or not parsed.netloc:
+            return False, "apiURL must be a valid URL with scheme (https://)"
+        if parsed.scheme != 'https':
+            return False, "apiURL must use HTTPS"
+    except Exception as e:
+        return False, f"Invalid apiURL format: {str(e)}"
+
+    # Validate config ID is numeric
+    try:
+        int(config['etp_config_id'])
+    except ValueError:
+        return False, "etp_config_id must be a valid integer"
+
+    return True, None
+
+
+def validate_api_response(response, endpoint_name):
+    """
+    Validate API response and provide detailed error information.
+
+    Args:
+        response: requests.Response object
+        endpoint_name: Name of the endpoint for error messages
+
+    Returns:
+        tuple: (is_valid, error_message, data)
+    """
+    if response.status_code == 200:
+        try:
+            data = response.json()
+            return True, None, data
+        except json.JSONDecodeError as e:
+            return False, f"{endpoint_name}: Invalid JSON response - {str(e)}", None
+    elif response.status_code == 400:
+        return False, f"{endpoint_name}: Bad request - check input parameters", None
+    elif response.status_code == 401:
+        return False, f"{endpoint_name}: Authentication failed - check API credentials", None
+    elif response.status_code == 403:
+        return False, f"{endpoint_name}: Access forbidden - check permissions and config ID", None
+    elif response.status_code == 404:
+        return False, f"{endpoint_name}: Resource not found", None
+    elif response.status_code == 429:
+        return False, f"{endpoint_name}: Rate limit exceeded - please retry later", None
+    elif response.status_code >= 500:
+        return False, f"{endpoint_name}: Server error ({response.status_code})", None
+    else:
+        return False, f"{endpoint_name}: Unexpected status code {response.status_code}", None
+
+
 class APIAKAOpenParser():
      def __init__(self, ctoken, csecret, atoken, configID, baseurl, rrecord):
         self.misp_event = MISPEvent()
@@ -58,6 +166,12 @@ class APIAKAOpenParser():
         return {'results': results}
 
      def parse_domain(self, rrecord):
+        # Validate domain format
+        is_valid, error_msg = validate_domain(rrecord)
+        if not is_valid:
+            log.error(f"Domain validation failed: {error_msg}")
+            raise ValueError(f"Invalid domain: {error_msg}")
+
         aka_object = MISPObject('Akamai IOC enrich')
         session  = requests.Session()
         session.auth = EdgeGridAuth(
@@ -65,10 +179,13 @@ class APIAKAOpenParser():
         client_secret = self.csecret,
         access_token  = self.atoken
         )
-        result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/information?record=' + rrecord))  
-        if result.status_code != 200:
-            raise Exception ("Akamai Open API return error: " + str(result.status_code))
-        q = result.json()
+
+        # Get IOC information with validation
+        result = session.get(urljoin(self.baseurl, '/etp-report/v3/ioc/information?record=' + rrecord))
+        is_valid, error_msg, q = validate_api_response(result, 'IOC Information')
+        if not is_valid:
+            log.error(f"API error: {error_msg}")
+            raise Exception(error_msg)
         to_Enrich = ""
         whois_info = ""
         urlList = ""
@@ -125,8 +242,12 @@ class APIAKAOpenParser():
                 ThreatTag = tagval
                 for item in threatIN:
                     if item['threatId'] != tmpI:
-                        addresult = session.get(urljoin(self.baseurl, '/etp-report/v1/configs/' + str(self.configID) + '/threats/' + str(item['threatId'])))
-                        d = addresult.json()
+                        # Note: v3 API uses /threats/threat-meta endpoint. May need threatId as query parameter
+                        addresult = session.get(urljoin(self.baseurl, '/etp-report/v3/configs/' + str(self.configID) + '/threats/threat-meta?threatId=' + str(item['threatId'])))
+                        is_valid, error_msg, d = validate_api_response(addresult, 'Threat Metadata')
+                        if not is_valid:
+                            log.warning(f"Failed to get threat metadata for {item['threatId']}: {error_msg}")
+                            continue
                         threatInfo = "\nThreat Name: " + str(d['threatName']) + "\nDescription: " + str(d['description'] + " ")
                         try:
                             if d['familyName'] != "" and d['threatName'] != "":
@@ -147,12 +268,15 @@ class APIAKAOpenParser():
             to_Enrich += "\nURL list: \n" + urlList + "\n"
         
         try:
-            changes_result = session.get(urljoin(self.baseurl, '/etp-report/v1/ioc/changes?record=' + rrecord))
-            changes = changes_result.json()
-            for change in changes:
-                aka_object.add_attribute('timeline', disable_correlation=True, **{'type': 'datetime', 'value': change['date'], 'comment': str(change["description"])})
+            changes_result = session.get(urljoin(self.baseurl, '/etp-report/v3/ioc/changes?record=' + rrecord))
+            is_valid, error_msg, changes = validate_api_response(changes_result, 'IOC Changes')
+            if is_valid and changes:
+                for change in changes:
+                    aka_object.add_attribute('timeline', disable_correlation=True, **{'type': 'datetime', 'value': change['date'], 'comment': str(change["description"])})
+            else:
+                log.info(f'Could not get IOC changes: {error_msg}')
         except Exception as e:
-            log.info('Exception in custom info {}'.format(e))
+            log.info('Exception getting IOC changes: {}'.format(e))
 
         aka_object.add_attribute('Domain Threat Info', type='text', value=to_Enrich, Tag=tagval, disable_correlation=True)
         self.misp_event.add_object(**aka_object)
@@ -173,11 +297,15 @@ class APIAKAOpenParser():
             confID = self.configID
             epoch_time = int(time.time())
             last_30_days = epoch_time - 3600 * 24 * 30  # last month by default for now
-            url = f'/etp-report/v2/configs/{str(confID)}' + \
+            url = f'/etp-report/v3/configs/{str(confID)}' + \
                   f'/dns-activities/aggregate?cardinality=2500&dimension={dimension}&endTimeSec={epoch_time}&filters' + \
                   f'=%7B%22domain%22:%7B%22in%22:%5B%22{rrecord}%22%5D%7D%7D&startTimeSec={last_30_days}'
-            _result = session.get(urljoin(self.baseurl, url)).json()
-            if _result['dimension']['total'] != 0:
+            dns_response = session.get(urljoin(self.baseurl, url))
+            is_valid, error_msg, _result = validate_api_response(dns_response, f'DNS Activities ({dimension})')
+            if not is_valid:
+                log.warning(f"DNS activities API error for dimension {dimension}: {error_msg}")
+                continue
+            if _result and 'dimension' in _result and _result['dimension']['total'] != 0:
                  _text += dimension + ' involved\n\n'
                  if 'aggregations' in _result:
                     for el in _result['aggregations']:
@@ -200,30 +328,69 @@ def version():
 def handler(q=False):
     if q is False:
         return False
-    request  = json.loads(q)
-    if request.get('config'):
-        if (request['config']['client_token'] is '') \
-            or (request['config']['client_secret'] is '') \
-            or (request['config']['access_token'] is '') \
-            or (request['config']['etp_config_id'] is '') \
-            or (request['config']['apiURL'] is ''):
-            misperrors['error'] = "Akamai Open API credentials are missing"
-            return misperrors
+
+    try:
+        request = json.loads(q)
+    except json.JSONDecodeError as e:
+        misperrors['error'] = f"Invalid JSON input: {str(e)}"
+        return misperrors
+
+    # Validate configuration
+    if not request.get('config'):
+        misperrors['error'] = "Missing configuration"
+        return misperrors
+
+    is_valid, error_msg = validate_api_credentials(request['config'])
+    if not is_valid:
+        misperrors['error'] = f"Configuration validation failed: {error_msg}"
+        return misperrors
+
+    # Validate attribute
+    if 'attribute' not in request:
+        misperrors['error'] = "Missing attribute in request"
+        return misperrors
+
     attribute = request['attribute']
+
+    if 'type' not in attribute:
+        misperrors['error'] = "Missing attribute type"
+        return misperrors
+
+    if attribute['type'] not in ['domain', 'hostname']:
+        misperrors['error'] = f"Unsupported attribute type: {attribute['type']}"
+        return misperrors
+
+    # Extract values
     ctoken   = str(request['config']['client_token'])
     csecret  = str(request['config']['client_secret'])
     atoken   = str(request['config']['access_token'])
     configID = str(request['config']['etp_config_id'])
     baseurl  = str(request['config']['apiURL'])
-    rrecord = attribute['value'] if 'value' in attribute else attribute['value1']
+    rrecord = attribute.get('value') or attribute.get('value1')
+
+    if not rrecord:
+        misperrors['error'] = "Missing attribute value"
+        return misperrors
+
+    # Map attribute type to parser method
     mapping = {
             'domain': 'parse_domain',
             'hostname': 'parse_domain'
     }
-    aka_parser = APIAKAOpenParser(ctoken, csecret, atoken, configID, baseurl, rrecord)
-    attribute_value = attribute['value'] if 'value' in attribute else attribute['value1']
-    getattr(aka_parser, mapping[attribute['type']])(attribute_value)
-    return aka_parser.get_results()
+
+    try:
+        aka_parser = APIAKAOpenParser(ctoken, csecret, atoken, configID, baseurl, rrecord)
+        attribute_value = attribute.get('value') or attribute.get('value1')
+        getattr(aka_parser, mapping[attribute['type']])(attribute_value)
+        return aka_parser.get_results()
+    except ValueError as e:
+        misperrors['error'] = f"Validation error: {str(e)}"
+        log.error(f"Validation error: {str(e)}")
+        return misperrors
+    except Exception as e:
+        misperrors['error'] = f"Processing error: {str(e)}"
+        log.error(f"Processing error: {str(e)}")
+        return misperrors
 
 
 
