@@ -17,7 +17,7 @@ authors = [
 maintainers = [
     {name = "Akamai Security Team", email = "security@akamai.com"}
 ]
-requires-python = ">=3.6"
+requires-python = ">=3.10"
 keywords = ["misp", "threat-intelligence", "akamai", "etp", "ioc", "security"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -26,10 +26,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -66,7 +62,7 @@ Changelog = "https://github.com/akamai/Akamai-MISP/blob/main/CHANGELOG.md"
 py-modules = ["akamai_ioc"]
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]

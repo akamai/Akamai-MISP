@@ -1,6 +1,6 @@
 # Akamai-MISP Integration
 
-[![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MISP 2.5.32+](https://img.shields.io/badge/MISP-2.5.32+-green.svg)](https://www.misp-project.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -70,7 +70,7 @@ See [CHANGELOG.md](CHANGELOG.md) for complete details.
 | Component | Minimum Version | Recommended | Notes |
 |-----------|----------------|-------------|-------|
 | **MISP Platform** | 2.4.x | 2.5.32+ | [Installation guide](https://www.misp-project.org/download/#virtual-images) |
-| **Python** | 3.6 | 3.10+ | Required for module execution |
+| **Python** | 3.10 | 3.12+ | Required by pymisp 2.5.x |
 | **Akamai ETP** | - | - | ETP Intelligence license required |
 | **API Access** | - | - | Akamai Open API credentials |
 
@@ -211,7 +211,7 @@ Test the module with a sample domain or hostname attribute in MISP:
 3. Right-click the attribute and select **Enrichment** → **akamai_ioc**
 4. View the enriched data
 
-**Logs**: Check `akamai.log` for detailed execution information.
+**Logs**: Check `akamai.log` (in the misp-modules working directory) for detailed execution information. Set the `AKAMAI_IOC_LOG_FILE` environment variable on the misp-modules service to write the log elsewhere. If the file cannot be opened, log messages go to the misp-modules logs instead.
 
 ---
 
@@ -463,7 +463,7 @@ bandit -r akamai_ioc.py
 
 - All tests must pass: `pytest tests/ -v`
 - Maintain test coverage
-- Test with Python 3.6, 3.8, 3.10+
+- Test with Python 3.10+
 - Validate against MISP 2.5.32+
 
 ---

@@ -2,6 +2,24 @@
 
 All notable changes to the Akamai-MISP integration module.
 
+## [Unreleased]
+
+### Fixed
+- Threat tags no longer leak between threats or onto the "Domain Threat Info" attribute (shared-list aliasing)
+- `source:AkamaiETP` is kept alongside `AkamaiETP:incident-classification=incident` when customer DNS activity is found
+- Customer Attribution is added as a single `misc` object instead of once per DNS dimension with duplicated text
+- Domain values are stripped before use and all query parameters are URL-encoded via `params=`
+- Empty or malformed `badUrls`, threat-meta (`threatName`/`description`/`externalLinks`) and IOC change entries no longer abort enrichment
+- DNS-activity and threat-meta network errors are logged and skipped instead of failing the whole enrichment
+- A 404 from IOC information is treated as "no Akamai data" (DNS attribution still runs) instead of a processing error
+- WHOIS `registrantOrganization` field name typo (`strantOrganizatione`) corrected
+- Multiple registrant emails are added as separate `whois-registrant-email` attributes
+- Logging no longer calls `logging.basicConfig` (which configured the root logger of the shared misp-modules process) and no longer fails at import if `akamai.log` is not writable; path configurable via `AKAMAI_IOC_LOG_FILE`
+- `moduleinfo` version/description updated (was `0.1` / "Get Akamai IOC v1 infomration.")
+
+### Changed
+- Minimum Python raised to 3.10 to match `pymisp>=2.5.32` (which requires Python >=3.10)
+
 ## [2.0.0] - 2026-02-05
 
 ### Major Changes

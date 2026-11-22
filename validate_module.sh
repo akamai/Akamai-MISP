@@ -14,9 +14,9 @@ echo "1. Checking Python version..."
 python_version=$(python3 --version 2>&1 | awk '{print $2}')
 echo "   Python version: $python_version"
 
-required_version="3.6"
+required_version="3.10"
 if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]; then
-    echo "   ✗ ERROR: Python 3.6+ required"
+    echo "   ✗ ERROR: Python 3.10+ required (pymisp 2.5.x)"
     exit 1
 fi
 echo "   ✓ Python version OK"
