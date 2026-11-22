@@ -180,6 +180,13 @@ You'll receive:
 2. Navigate to: **Security** → **Secure Internet Access Enterprise** → **Utilities** → **ETP Client**
 3. Note your **CUSTOMER IDENTIFIER** (this is your config ID)
 
+**Tip:** You can also read the config ID from the URL of any page in the ETP UI. It is the number right after the app path. In these examples it is `99999`:
+
+- Original ETP UI: `https://control.akamai.com/apps/etp-ui/#/99999/sites/list`
+- Enterprise Center UI: `https://control.akamai.com/apps/zt-ui/#/etp/99999/location/list`
+
+> **Note:** Akamai's [MISP integration guide](https://techdocs.akamai.com/etp/docs/indicator-search#integrate-product_nickname-with-misp-threat-sharing) calls this value the contract ID and refers to the setting as `Plugin.Enrichment_akamai_ioc_configID`. In MISP the setting is named `Enrichment_akamai_ioc_etp_config_id`.
+
 ### Step 3: Configure in MISP
 
 1. Navigate to your MISP Plugin settings:
