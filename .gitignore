@@ -94,4 +94,3 @@ temp/
 
 # MISP specific
 misp_modules.log
-.secrets.baseline
